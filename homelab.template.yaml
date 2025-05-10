@@ -1,0 +1,762 @@
+- name: Homelab
+  columns:
+    - size: small
+      widgets:
+        - type: server-stats
+          servers:
+            - type: local
+              name: Glance
+        - type: custom-api
+          title: Proxmox Stats
+          cache: 1m
+          url: https://192.168.1.80:8006/api2/json/cluster/resources
+          allow-insecure: true
+          headers:
+            Accept: application/json
+            Authorization: PVEAPIToken=x@pve!glance=xxx
+          template: |
+            <div class="flex flex-column gap-5">
+              <div class="flex justify-between text-center">
+                <div>
+                  {{ $nodes_online := len (.JSON.Array "data.#(type==\"node\")#|#(status==\"online\")#") }}
+                  {{ $nodes_total := len (.JSON.Array "data.#(type==\"node\")#") }}
+                  <div class="color-highlight size-h3">{{ $nodes_online }}/{{ $nodes_total }}</div>
+                  <div class="size-h5 uppercase">Node</div>
+                </div>
+                <div>
+                  {{ $lxc_running := len (.JSON.Array "data.#(type==\"lxc\")#|#(status==\"running\")#|#(template==0)#") }}
+                  {{ $lxc_total := len (.JSON.Array "data.#(type==\"lxc\")#|#(template==0)#") }}
+                  <div class="color-highlight size-h3">{{ $lxc_running }}/{{ $lxc_total }}</div>
+                  <div class="size-h5 uppercase">LXC</div>
+                </div>
+                <div>
+                  {{ $qemu_running := len (.JSON.Array "data.#(type==\"qemu\")#|#(status==\"running\")#|#(template==0)#") }}
+                  {{ $qemu_total := len (.JSON.Array "data.#(type==\"qemu\")#|#(template==0)#") }}
+                  <div class="color-highlight size-h3">{{ $qemu_running }}/{{ $qemu_total }}</div>
+                  <div class="size-h5 uppercase">VM</div>
+                </div>
+                <div>
+                    {{ $storage_available := len (.JSON.Array "data.#(type==\"storage\")#|#(status==\"available\")#") }}
+                    {{ $storage_total := len (.JSON.Array "data.#(type==\"storage\")#") }}
+                    <div class="color-highlight size-h3">{{ $storage_available }}/{{ $storage_total }}</div>
+                    <div class="size-h5 uppercase">Storage</div>
+                </div>
+              </div>
+            </div>
+        - type: custom-api
+          cache: 1h
+          title: Internet Speed
+          url: http://192.168.1.167:5216/api/speedtests?hours=24
+          template: |
+            <div class="flex justify-between text-center margin-block-3">
+                <div>
+                    <div class="color-highlight size-h3">{{ .JSON.Get "0.download" }}</div>
+                    <div class="size-h6">DOWNLOAD</div>
+                </div>
+                <div>
+                    <div class="color-highlight size-h3">{{ .JSON.Get "0.upload" }}</div>
+                    <div class="size-h6">UPLOAD</div>
+                </div>
+                <div>
+                    <div class="color-highlight size-h3">{{ .JSON.Get "0.ping" }}</div>
+                    <div class="size-h6">PING</div>
+                </div>
+            </div>
+        - type: dns-stats
+          service: pihole
+          url: http://192.168.1.161
+          token: xxx
+        - type: custom-api
+          title: Tailscale Devices
+          title-url: https://login.tailscale.com/admin/machines
+          url: https://api.tailscale.com/api/v2/tailnet/-/devices
+          headers:
+            Authorization: Bearer xxx
+          cache: 10m
+          template: |
+            <style>
+              .device-info-container {
+                position: relative;
+                overflow: hidden;
+                height: 1.5em;
+              }
+
+              .device-info {
+                display: flex;
+                transition: transform 0.2s ease, opacity 0.2s ease;
+              }
+
+              .device-ip {
+                position: absolute;
+                top: 0;
+                left: 0;
+                transform: translateY(-100%);
+                opacity: 0;
+                transition: transform 0.2s ease, opacity 0.2s ease;
+              }
+
+              .device-info-container:hover .device-info {
+                transform: translateY(100%);
+                opacity: 0;
+              }
+
+              .device-info-container:hover .device-ip {
+                transform: translateY(0);
+                opacity: 1;
+              }
+
+              .update-indicator {
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background-color: var(--color-primary);
+                display: inline-block;
+                margin-left: 4px;
+                vertical-align: middle;
+              }
+
+              .offline-indicator {
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background-color: var(--color-negative);
+                display: inline-block;
+                margin-left: 4px;
+                vertical-align: middle;
+              }
+
+              .device-name-container {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+              }
+
+              .indicators-container {
+                display: flex;
+                align-items: center;
+                gap: 4px;
+              }
+            </style>
+            <ul class="list list-gap-10 collapsible-container" data-collapse-after="4">
+              {{ range .JSON.Array "devices" }}
+              <li>
+                <div class="flex items-center gap-10">
+                  <div class="device-name-container grow">
+                    <span class="size-h4 block text-truncate color-primary">
+                      {{ findMatch "^([^.]+)" (.String "name") }}
+                    </span>
+                    <div class="indicators-container">
+                      {{ if (.Bool "updateAvailable") }}
+                      <span class="update-indicator" data-popover-type="text" data-popover-text="Update Available"></span>
+                      {{ end }}
+
+                      {{ $lastSeen := .String "lastSeen" | parseTime "rfc3339" }}
+                      {{ if not ($lastSeen.After (offsetNow "-10s")) }}
+                      {{ $lastSeenTimezoned := $lastSeen.In now.Location }}
+                      <span class="offline-indicator" data-popover-type="text"
+                        data-popover-text="Offline - Last seen {{ $lastSeenTimezoned.Format " Jan 2 3:04pm" }}"></span>
+                      {{ end }}
+
+                    </div>
+                  </div>
+                </div>
+                <div class="device-info-container">
+                  <ul class="list-horizontal-text device-info">
+                    <li>{{ .String "os" }}</li>
+                    <li>{{ .String "user" }}</li>
+                  </ul>
+                  <div class="device-ip">
+                    {{ .String "addresses.0"}}
+                  </div>
+                </div>
+              </li>
+              {{ end }}
+            </ul>
+    - size: full
+      widgets:
+        - type: monitor
+          cache: 1m
+          title: Hardware
+          sites:
+            - title: Beelink
+              url: http://192.168.1.80:8006
+              icon: di:proxmox
+              allow-insecure: true
+            - title: OptiPlex
+              url: http://192.168.1.116:8006
+              icon: di:proxmox
+              allow-insecure: true
+            - title: Synology DS923+
+              url: http://aynas:5000
+              check-url: http://192.168.1.71:5000
+              icon: di:synology
+        - type: monitor
+          cache: 1m
+          title: Services
+          sites:
+            - title: Home Assistant
+              url: http://192.168.1.122:8123
+              icon: di:home-assistant
+              allow-insecure: true
+            - title: Zigbee2MQTT
+              url: http://zigbee2mqtt:8081/
+              check-url: http://192.168.1.131:8081
+              icon: di:zigbee2mqtt
+            - title: Docmost
+              url: http://docmost:3000
+              check-url: http://192.168.1.157:3000
+              icon: https://img-s-msn-com.akamaized.net/tenant/amp/entityid/AA1zaNBE.img?w=768&h=768&m=6
+            - title: Vikunja
+              url: http://vikunja:3456/
+              check-url: http://192.168.1.153:3456
+              icon: di:vikunja
+            - title: N8N
+              url: http://n8n:5678
+              check-url: http://192.168.1.82:5678
+              icon: di:n8n
+            - title: Portainer
+              url: https://100.106.192.97:9443/#!/auth
+              check-url: https://192.168.1.35:9443/#!/auth
+              icon: di:portainer
+              allow-insecure: true
+            - title: Synology Photos
+              url: http://aynas:5000/?launchApp=SYNO.Foto.AppInstance
+              check-url: http://192.168.1.71:5000
+              icon: https://www.storagealchemist.com/wp-content/uploads/2022/04/Syno-Photos-logo-DSM7.png
+            - title: Synology Drive
+              url: http://aynas:5000/?launchApp=SYNO.SDS.Drive.Application#MyDrive
+              check-url: http://192.168.1.71:5000
+              icon: https://play-lh.googleusercontent.com/DOhj0GDYlhVFlmmxWvQBL--KXNYs2EcDloCoEIcuckKcBUYbLbDq-op-B4n-C8B6JuQ=w240-h480-rw
+            - title: PiHole
+              url: http://192.168.1.161/admin
+              check-url: http://192.168.1.161
+              icon: di:pi-hole
+              allow-insecure: true
+            - title: Uptime Kuma
+              url: http://uptimekuma:3001
+              check-url: http://192.168.1.190:3001
+              icon: di:uptime-kuma
+            - title: Grafana
+              url: http://grafana:3000
+              check-url: http://192.168.1.158:3000
+              icon: di:grafana
+            - title: InfluxDB
+              url: http://192.168.1.151:8888
+              icon: di:influxdb
+            - title: Mealie
+              url: http://192.168.1.35:9925/login/
+              icon: di:mealie
+            - title: ActualBudget
+              url: http://actualbudget:5006
+              check-url: http://192.168.1.64:5006
+              icon: di:actual-budget
+            - title: HomeBox
+              url: http://homebox:7745
+              check-url: http://192.168.1.88:7745
+              icon: di:homebox
+              allow-insecure: true
+            - title: MySpeed
+              url: http://myspeed:5216
+              check-url: http://192.168.1.167:5216
+              icon: di:myspeed
+            - title: MQTT
+              url: http://192.168.1.131:8081/#/device/0xa4c13865734561ed/info
+              icon: si:mqtt
+              allow-insecure: true
+            - title: AFFiNE
+              url: http://affine:3010
+              check-url: http://192.168.1.126:3010
+              icon: di:affine-light
+            - title: Nginx Proxy Manager
+              url: http://nginxproxymanager:81
+              check-url: http://192.168.1.9:81
+              icon: di:nginx-proxy-manager
+            
+
+        - type: monitor
+          cache: 1m
+          title: Servarr
+          sites:
+            - title: Plex
+              url: http://plex:32400/web
+              check-url: http://192.168.1.81:32400/web
+              icon: di:plex
+            - title: Komga
+              url: http://komga:25600/
+              check-url: http://192.168.1.147:25600
+              icon: di:komga
+            - title: Overseerr
+              url: http://overseerr:5055
+              check-url: http://192.168.1.106:5055
+              icon: di:overseerr
+            - title: Homarr
+              url: http://homarr:3000/board
+              check-url: http://192.168.1.49:3000
+              icon: di:homarr
+              allow-insecure: true
+            - title: Tautulli
+              url: http://tautulli:8181/
+              check-url: http://192.168.1.86:8181
+              icon: di:tautulli
+            - title: qBittorrent
+              url: http://qbittorrent:8090
+              check-url: http://192.168.1.26:8090
+              icon: di:qbittorrent
+            - title: Radarr
+              url: http://radarr:7878/
+              check-url: http://192.168.1.40:7878
+              icon: di:radarr
+            - title: Sonarr
+              url: http://sonarr:8989/
+              check-url: http://192.168.1.177:8989
+              icon: di:sonarr
+            - title: Readarr
+              url: http://readarr:8787
+              check-url: http://192.168.1.170:8787
+              icon: di:readarr
+            - title: Prowlarr
+              url: http://prowlarr:9696
+              check-url: http://192.168.1.140:9696
+              icon: di:prowlarr
+            - title: FlareSolverr
+              url: http://192.168.1.183:8191
+              icon: di:flaresolverr
+    - size: small
+      widgets:
+        - type: weather
+          units: metric
+          hour-format: 24h
+          location: Lille, France
+        - type: bookmarks
+          groups:
+            - links:
+                - title: Proxmox Scripts
+                  url: https://community-scripts.github.io/ProxmoxVE/
+                - title: Tailscale 
+                  url: https://login.tailscale.com/admin/machines
+                - title: Freebox
+                  url: https://mafreebox.freebox.fr/#Fbx.os.app.lanbrowser.app
+                - title: S3 Glacier
+                  url: https://eu-west-1.signin.aws.amazon.com/oauth?client_id=arn:aws:signin:::console/glacier&code_challenge=i5Q-UedxMfXsw28KYRVKErFk_YwIo0yyda86pK0eozI&code_challenge_method=SHA-256&response_type=code&redirect_uri=https://eu-west-1.console.aws.amazon.com/glacier/home?hashArgs%3D%2523%252Fvaults%26isauthcode%3Dtrue%26oauthStart%3D1744918744869%26region%3Deu-west-1%26state%3DhashArgsFromTB_eu-west-1_3da6eea788e67b95
+        - type: custom-api
+          title: plex
+          cache: 1m
+          url: http://192.168.1.81:32400/status/sessions
+          headers:
+            Accept: application/json
+            X-Plex-Token: xxx
+          template: |
+            {{/* USER VARIABLES BEGIN */}}
+
+            {{/* Set to true if using the widget in a small column */}}
+            {{ $isSmallColumn := true }}
+
+            {{/* Set to true to use compact mode */}}
+            {{ $isCompact := true }}
+
+            {{/* Set to "text" to display the playing state in plain text */}}
+            {{/* Set to "indicator" to display a status badge instead of text */}}
+            {{/* Set to "" to hide the play state */}}
+            {{ $playState := "text" }}
+
+            {{/* Set to true to show thumbnails */}}
+            {{ $showThumbnail := true }}
+
+            {{/* Set to true to display paused items */}}
+            {{ $showPaused := false }}
+
+            {{/* Set to false to hide "Progress Bar" */}}
+            {{ $showProgressBar := true }}
+
+            {{/* Set to false to hide "Progress Info". Depends on $showProgressBar */}}
+            {{ $showProgressInfo := true }}
+
+            {{/* USER VARIABLES END */}}
+
+            {{ if eq .Response.StatusCode 200 }}
+              {{ $sessions := .JSON.Array "MediaContainer.Metadata" }}
+
+              {{ if eq (len $sessions) 0 }}
+                <p>Nobody's watching at this moment.</p>
+              {{ else }}
+                {{ if $isSmallColumn }}
+                  <div class="flex flex-column gap-10">
+                {{ else }}
+                  <div class="gap-10" style="display: grid; grid-template-columns: repeat(2, 1fr);">
+                {{ end }}
+
+                  {{ range $i, $session := $sessions }}
+                    {{/* WIDGET VARIABLES BEGIN */}}
+
+                    {{ $mediaType := $session.String "type" }}
+                    {{ $isPlaying := eq ($session.String "Player.state") "playing" }}
+                    {{ $state := $session.String "Player.state" }}
+
+                    {{ $isMovie := eq $mediaType "movie" }}
+                    {{ $isShows := eq $mediaType "episode" }}
+                    {{ $isMusic := eq $mediaType "track" }}
+
+                    {{ $user := $session.String "User.title"}}
+                    {{ $movieTitle := $session.String "title" }}
+                    {{ $showTitle := $session.String "grandparentTitle" }}
+                    {{ $showSeason := $session.String "parentIndex" }}
+                    {{ $showEpisode := $session.String "index" }}
+                    {{ $episodeTitle := $session.String "title" }}
+                    {{ $artist := $session.String "grandparentTitle" }}
+                    {{ $albumTitle := $session.String "parentTitle" }}
+                    {{ $songTitle := $session.String "title" }}
+                    {{ $default := $session.String "title" }}
+
+                    {{ $thumbPath := $session.String "thumb" }}
+                    {{ if or $isShows $isMusic }}
+                      {{ $thumbPath = $session.String "parentThumb" }}
+                    {{ end }}
+                    {{ $thumbURL := concat "http://192.168.1.81:32400" $thumbPath "?X-Plex-Token=xxx" }}
+
+                    {{ $duration := $session.Float "duration" }}
+                    {{ $offset := $session.Float "viewOffset" }}
+                    {{ $progress := mul 100 (div $offset $duration) | toInt }}
+                    {{ $remainingSeconds := div (sub $duration $offset) 1000 | toInt }}
+                    {{ $remainingSecondsString := printf "%ds" $remainingSeconds }}
+                    {{ $endTime := offsetNow $remainingSecondsString }}
+                    {{ $endHour := printf "%02d" $endTime.Hour }}
+                    {{ $endMinute := printf "%02d" $endTime.Minute }}
+
+
+                    {{/* WIDGET VARIABLES END */}}
+
+                    {{/* WIDGET TEMPLATE BEGIN */}}
+
+                    {{ if or $isPlaying $showPaused }}
+                      <div class="card gap-5">
+                        <div class="flex items-center gap-10 size-h3">
+                          <span class="color-primary">{{ $user }}</span>
+
+                          {{ if eq $playState "text" }}
+                            <span {{ if $isPlaying }}class="color-primary"{{ end }}>
+                              ({{ $state }})
+                            </span>
+                          {{ else if eq $playState "indicator" }}
+                            <style>
+                              @keyframes pulse {
+                                0% { box-shadow: 0 0 0 0 var(--color-text-base); }
+                                40% { box-shadow: 0 0 0 4px transparent; }
+                                100% { box-shadow: 0 0 0 4px transparent; }
+                              }
+                            </style>
+                            <div
+                              style="
+                                {{ if $isPlaying }}
+                                  animation: pulse 5s infinite;
+                                  background: var(--color-primary);
+                                {{ else }}
+                                  background: var(--color-text-base-muted);
+                                {{ end }}
+                                height: .7rem;
+                                width: .7rem;
+                                border-radius: 100%;
+                              "
+                            ></div>
+                          {{ else }}
+                          {{ end }}
+                        </div>
+
+                        <hr class="margin-bottom-5" />
+
+                        <div class="flex items-center gap-10" style="align-items: stretch;">
+                          {{ if eq $showThumbnail true }}
+                            <img
+                              src="{{ $thumbURL }}"
+                              alt="{{ $default }} thumbnail"
+                              class="shrink-0"
+                              loading="lazy"
+                              style="max-width: 7.5rem;
+                                border: 2px solid var(--color-primary);
+                                border-radius: var(--border-radius);
+                                object-fit: cover;
+                                {{ if $isCompact }}aspect-ratio: 1;{{ end }}
+                              "
+                            />
+                          {{ end }}
+
+                          <ul
+                            class="flex flex-column grow justify-evenly"
+                            style="width: 0;"
+                          >
+                            {{ if $isMovie }}
+                              <li>{{ $movieTitle }}</li>
+                            {{ else if $isShows }}
+                              {{ if $isCompact }}
+                                <ul class="list-horizontal-text flex-nowrap">
+                                  <li class="text-truncate shrink-0">{{ concat "S" $showSeason "E" $showEpisode }}</li>
+                                  <li class="text-truncate">{{ $showTitle }}</li>
+                                </ul>
+                                <li class="text-truncate">{{ $episodeTitle }}</li>
+                              {{ else }}
+                                <li class="text-truncate">{{ $showTitle }}</li>
+                                <li class="text-truncate">{{ concat "Season " $showSeason " Episode " $showEpisode }}</li>
+                                <li>{{ $episodeTitle }}</li>
+                              {{ end }}
+                            {{ else if $isMusic }}
+                              {{ if $isCompact }}
+                                <ul class="list-horizontal-text flex-nowrap">
+                                  <li class="text-truncate shrink-0">{{ $artist }}</li>
+                                  <li class="text-truncate">{{ $albumTitle }}</li>
+                                </ul>
+                              {{ else }}
+                                <li class="text-truncate">{{ $artist }}</li>
+                                <li class="text-truncate">{{ $albumTitle }}</li>
+                              {{ end }}
+                              <li class="text-truncate">{{ $songTitle }}</li>
+                            {{ else }}
+                              <li>{{ $default }}</li>
+                            {{ end }}
+
+                            <li>
+                              {{ if and $isPlaying $showProgressBar }}
+                                <div class="flex gap-10 items-center">
+                                  <div
+                                    class="grow"
+                                    style="height: 1rem;
+                                      max-width: 32rem;
+                                      border: 1px solid var(--color-text-base);
+                                      border-radius: var(--border-radius);
+                                      overflow: hidden;"
+                                  >
+                                    <style>
+                                      @keyframes progress-animation {
+                                        to { width: 100%; }
+                                      }
+                                    </style>
+                                    <div
+                                      style="height: 100%;
+                                        width: {{ $progress }}%;
+                                        background: var(--color-primary);
+                                        border-radius: 3px;
+                                        transition: width 1s linear;
+                                        animation: progress-animation {{ $remainingSeconds }}s linear forwards;"
+                                      data-progress="{{ $progress }}"
+                                      data-remaining="{{ $remainingSeconds }}">
+                                    </div>
+                                  </div>
+
+                                  {{ if $showProgressInfo }}
+                                    <p>{{ if and ( not $isCompact ) ( not $isSmallColumn ) }}ends at {{ end }}{{ $endHour -}}:{{- $endMinute }}</p>
+                                  {{ end }}
+                                </div>
+                              {{ end }}
+                            </li>
+                          </ul>
+                        </div>
+                      </div>
+                    {{ end }}
+
+                    {{/* WIDGET TEMPLATE END */}}
+
+                  {{ end }}
+                </div>
+              {{ end }}
+            {{ else }}
+              <p>Failed to fetch Plex sessions</p>
+            {{ end }}
+        - type: custom-api
+          frameless: true
+          title: plex history
+          cache: 5m
+          url: http://192.168.1.81:32400/status/sessions/history/all
+          headers:
+            Accept: application/json
+            X-Plex-Token: xxx
+          parameters:
+            limit: 20 # Modify this value for the length of the history
+            sort: viewedAt:desc
+          subrequests:
+            user:
+              url: http://192.168.1.81:32400/accounts
+              headers:
+                Accept: application/json
+                X-Plex-Token: xxx
+          template: |
+            {{/* USER VARIABLES BEGIN */}}
+
+            {{/* Set to true if using the widget in a small column */}}
+            {{ $isSmallColumn := true }}
+
+            {{/* Set to true to use a short hand display of Series information */}}
+            {{ $isCompact := false }}
+
+            {{/* Set to true to show thumbnails */}}
+            {{ $showThumbnail := true }}
+
+            {{/* Depends on $showThumbnail */}}
+            {{/* Set to "square" to have an aspect ratio of 1 */}}
+            {{/* Set to "portrait" to have an aspect ratio of 3/4 */}}
+            {{/* Set to "landscape" to have an aspect ratio of 4/3 */}}
+            {{/* Set to "" to have the original aspect ratio */}}
+            {{ $thumbAspectRatio := "portrait" }}
+
+            {{/* Set to true to display user name */}}
+            {{ $showUser := true }}
+
+            {{/* Set to true to get absolute time format instead of relatie format */}}
+            {{ $timeAbsolute := false }}
+
+            {{/* USER VARIABLES END */}}
+
+            {{ $users := "" }}
+            {{ if eq (.Subrequest "user").Response.StatusCode 200 }}
+              {{ $users = (.Subrequest "user").JSON.Array "MediaContainer.Account" }}
+            {{ end }}
+
+            {{ if eq .Response.StatusCode 200 }}
+              {{ $history := .JSON.Array "MediaContainer.Metadata" }}
+
+              {{ if eq (len $history) 0 }}
+                <p>stop what you are doing and go watch something !</p>
+              {{ else }}
+                <div class="carousel-container show-right-cutoff">
+                  <div class="cards-horizontal carousel-items-container">
+                    {{ range $n, $item := $history }}
+                      {{/* PLEX VARIABLES BEGIN */}}
+
+                      {{ $user := "" }}
+                      {{ $userID := $item.Int "accountID" }}
+                      {{ range $n, $u := $users }}
+                        {{ if eq $userID ($u.Int "id")}}
+                          {{ $user = $u.String "name" }}
+                          {{ break }}
+                        {{ end }}
+                      {{ end }}
+
+                      {{/* PLEX VARIABLES END */}}
+
+                      {{/* WIDGET VARIABLES BEGIN */}}
+
+                      {{ $mediaType := $item.String "type" }}
+
+                      {{ $isMovie := eq $mediaType "movie" }}
+                      {{ $isShows := eq $mediaType "episode" }}
+                      {{ $isMusic := eq $mediaType "track" }}
+
+                      {{ $movieTitle := $item.String "title" }}
+                      {{ $showTitle := $item.String "grandparentTitle" }}
+                      {{ $showSeason := $item.String "parentIndex" }}
+                      {{ $showEpisode := $item.String "index" }}
+                      {{ $episodeTitle := $item.String "title" }}
+                      {{ $artist := $item.String "grandparentTitle" }}
+                      {{ $albumTitle := $item.String "parentTitle" }}
+                      {{ $songTitle := $item.String "title" }}
+                      {{ $default := $item.String "title" }}
+
+                      {{ $thumbPath := $item.String "thumb" }}
+                      {{ if or $isShows $isMusic }}
+                        {{ $thumbPath = $item.String "parentThumb" }}
+                      {{ end }}
+                      {{ $thumbURL := concat "http://192.168.1.81:32400" $thumbPath "?X-Plex-Token=xxx" }}
+
+                      {{ $playedAt := $item.String "viewedAt" | parseRelativeTime "unix" }}
+                      {{ if $timeAbsolute }}
+                        {{ $t := $item.String "viewedAt" | parseTime "unix" }}
+                        {{ $playedAt = $t.Format "Jan 02 15:04" }}
+                      {{ end }}
+
+                      {{/* WIDGET VARIABLES END */}}
+
+                      {{/* WIDGET TEMPLATE BEGIN */}}
+
+                      <div class="card widget-content-frame" >
+                        {{ if $showThumbnail }}
+                          <img
+                            src="{{ $thumbURL }}"
+                            alt="{{ $default }} thumbnail"
+                            loading="lazy"
+                            class="shrink-0"
+                            style="object-fit: cover;
+                              {{ if eq $thumbAspectRatio "square" }}
+                                aspect-ratio: 1;
+                              {{ else if eq $thumbAspectRatio "portrait" }}
+                                aspect-ratio: 3/4;
+                              {{ else if eq $thumbAspectRatio "landscape" }}
+                                aspect-ratio: 4/3;
+                              {{ else }}
+                                aspect-ratio: initial;
+                              {{ end }}
+                              border-radius: var(--border-radius) var(--border-radius) 0 0;"
+                          />
+                        {{ end }}
+                        <div class="grow padding-inline-widget margin-top-10 margin-bottom-10 {{ if $isSmallColumn -}}text-center{{- end }}" >
+                          <ul
+                            class="
+                              flex
+                              flex-column
+                              justify-evenly
+                              margin-bottom-3
+                              {{ if $isSmallColumn -}}size-h6{{- end }}
+                            "
+                            style="height: 100%;"
+                          >
+                            {{ if $isCompact }}
+                              <ul class="list-horizontal-text flex-nowrap">
+                                <li class="color-primary text-truncate">{{ $user }}</li>
+                                {{ if not $timeAbsolute }}
+                                  <li class="shrink-0"><span {{ $playedAt }}></span></li>
+                                {{ end }}
+                              </ul>
+                              {{ if $timeAbsolute }}
+                                <li>{{ $playedAt }}</li>
+                              {{ end }}
+                            {{ else }}
+                              {{ if $showUser }}
+                                <li class="color-primary text-truncate">{{ $user }}</li>
+                              {{ end }}
+
+                              <li class="color-base text-truncate">
+                                {{ if $timeAbsolute }}
+                                  <span>{{ $playedAt }}</span>
+                                {{ else }}
+                                  <span {{ $playedAt }}></span>
+                                  <span> ago</span>
+                                {{ end }}
+                              </li>
+                            {{ end }}
+                            {{ if $isMovie }}
+                              <li {{ if $isCompact -}}class="text-truncate"{{- end }}>{{ $movieTitle }}</li>
+                            {{ else if $isShows }}
+                              {{ if $isCompact }}
+                                <ul class="list-horizontal-text flex-nowrap">
+                                  <li>{{ concat "S" $showSeason "E" $showEpisode }}</li>
+                                  <li class="text-truncate">{{ $showTitle }}</li>
+                                </ul>
+                              {{ else }}
+                                <li class="text-truncate" >{{ $showTitle }}</li>
+                                {{ if $isSmallColumn }}
+                                  <li>{{ concat "S" $showSeason "E" $showEpisode }}</li>
+                                {{ else }}
+                                  <li class="text-truncate" >{{ concat "Season " $showSeason " Episode " $showEpisode }}</li>
+                                {{ end }}
+                              {{ end }}
+                              <li class="text-truncate" >{{ $episodeTitle }}</li>
+                            {{ else if $isMusic }}
+                              {{ if $isCompact }}
+                                <li class="text-truncate">{{ $artist }}</li>
+                              {{ else }}
+                                <li class="text-truncate">{{ $artist }}</li>
+                                <li class="text-truncate">{{ $albumTitle }}</li>
+                              {{ end }}
+                              <li class="text-truncate">{{ $songTitle }}</li>
+                            {{ else }}
+                              <li class="text-truncate">{{ $default }}</li>
+                            {{ end }}
+                          </ul>
+                        </div>
+                      </div>
+
+                      {{/* WIDGET TEMPLATE END */}}
+
+                    {{ end }}
+                  </div>
+                </div>
+              {{ end }}
+            {{ else }}
+              <p>Failed to fetch Plex history</p>
+            {{ end }}
