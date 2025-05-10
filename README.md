@@ -1,5 +1,5 @@
 # glance-templates
-YAML configuration for glanceapp/glance
+YAML configuration for [glanceapp/glance](https://github.com/glanceapp/glance)
 
 ![image](https://github.com/user-attachments/assets/50077c91-073d-478f-af27-993047b81760)
 
