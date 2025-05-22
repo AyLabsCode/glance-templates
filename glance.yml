@@ -12,4 +12,3 @@ pages:
   - $include: tabs/aylabs.yml
 branding:
   logo-text: "root@aylabs:~#"
-TOKEN: "toto"
