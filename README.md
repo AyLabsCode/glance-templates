@@ -1,7 +1,8 @@
 # glance-templates
 YAML configuration for [glanceapp/glance](https://github.com/glanceapp/glance)
 
-![image](https://github.com/user-attachments/assets/50077c91-073d-478f-af27-993047b81760)
+![image](https://github.com/user-attachments/assets/18cd82ed-bece-4204-a054-1808033bc48a)
+
 
 # Getting started
 
