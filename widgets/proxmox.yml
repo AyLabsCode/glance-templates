@@ -1,0 +1,231 @@
+- type: custom-api
+  title: Proxmox
+  cache: 1m
+  url: https://192.168.1.80:8006/api2/json/cluster/resources
+  allow-insecure: true
+  headers:
+    Accept: application/json
+    Authorization: PVEAPIToken=${PROXMOX}
+  template: |
+    <style>
+      .resource-bar {
+        width: 100%;
+        height: 10px;
+        background: rgba(255,255,255,0.1);
+        border-radius: 5px;
+        overflow: hidden;
+        margin-bottom: 8px;
+        border: 1px solid rgba(255,255,255,0.07);
+      }
+      .resource-bar-fill {
+        height: 100%;
+        border-radius: 3px;
+        transition: width 0.5s ease;
+        min-width: 5px;
+      }
+      .resource-bar-fill-proxmox {
+        background: linear-gradient(90deg, orange 0%, yellow 100%);
+      }
+      .resource-bar-fill-synology {
+        background: linear-gradient(90deg, #3863A0 0%, #4A7EC8 100%);
+      }
+      
+      .cluster-header {
+        padding: 8px;
+        text-align: center;
+        color: var(--color-text-base);
+        font-size: 0.9em;
+        margin-bottom: 15px;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      .counter-section {
+        display: flex;
+        justify-content: space-between;
+        text-align: center;
+        margin-top: 0px;
+        padding-top: 12px;
+      }
+      .counter-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .node-section {
+        margin-top: 20px;
+        border-top: 1px solid rgba(255,255,255,0.05);
+        padding-top: 12px;
+      }
+      .separator {
+        border-top: 1px solid rgba(255,255,255,0.05);
+      }
+      .node-title {
+        font-size: 0.9em;
+        color: var(--color-text-base);
+        margin-bottom: 10px;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        display: flex;
+        justify-content: space-between;
+      }
+      .node-stats {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+      }
+      .stats-bars {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+
+      }
+      .node-name {
+        font-weight: 500;
+        color: var(--color-highlight);
+        font-size: 0.95em;
+      }
+      .node-value {
+        text-align: right;
+        color: var(--color-text-base);
+        font-size: 0.85em;
+      }
+      .pve-stats {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+      }
+      .stat-value {
+        font-weight: 500;
+        color: var(--color-highlight);
+      }
+      .usage-info {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 2px;
+        font-size: 0.85em;
+        color: var(--color-text-base);
+      }
+    </style>
+
+    <div class="flex flex-column gap-5">
+      <!-- Statistiques CPU et RAM globales du cluster -->
+      <div class="flex flex-column">
+        <div class="stats-bars">
+          <!-- CPU Usage -->
+          {{ $cpu_total := 0.0 }}
+          {{ $cpu_used := 0.0 }}
+          {{ range .JSON.Array "data.#(type==\"node\")#" }}
+            {{ $cpu_total = add $cpu_total (.Float "maxcpu") }}
+            {{ $cpu_used = add $cpu_used (mul (.Float "maxcpu") (.Float "cpu")) }}
+          {{ end }}
+          {{ $cpu_percent := 0.0 }}
+          {{ if gt $cpu_total 0.0 }}
+            {{ $cpu_percent = mul (div $cpu_used $cpu_total) 100 }}
+          {{ end }}
+          
+          <!-- RAM Usage -->
+          {{ $mem_total := 0.0 }}
+          {{ $mem_used := 0.0 }}
+          {{ range .JSON.Array "data.#(type==\"node\")#" }}
+            {{ $mem_total = add $mem_total (.Float "maxmem") }}
+            {{ $mem_used = add $mem_used (.Float "mem") }}
+          {{ end }}
+          {{ $mem_percent := 0.0 }}
+          {{ if gt $mem_total 0.0 }}
+            {{ $mem_percent = mul (div $mem_used $mem_total) 100 }}
+          {{ end }}
+          
+          <!-- Disk Usage -->
+          {{ $disk_total := 0.0 }}
+          {{ $disk_used := 0.0 }}
+          {{ range .JSON.Array "data.#(type==\"storage\")#" }}
+            {{ if ne (.String "storage") "AyNAS-Proxmox" }}
+              {{ $disk_total = add $disk_total (.Float "maxdisk") }}
+              {{ $disk_used = add $disk_used (.Float "disk") }}
+            {{ end }}
+          {{ end }}
+          {{ $disk_percent := 0.0 }}
+          {{ if gt $disk_total 0.0 }}
+            {{ $disk_percent = mul (div $disk_used $disk_total) 100 }}
+          {{ end }}
+          
+          <div class="resource-item">
+            <div class="flex justify-between">
+              <span class="size-h5 uppercase"><span class="color-highlight">CPU</span> (<span>{{ printf "%.0f" $cpu_total }} cores</span>)</span>
+              <span class="color-highlight size-h3">{{ printf "%.1f" $cpu_percent }}%</span>
+            </div>
+            <div class="resource-bar">
+              <div class="resource-bar-fill resource-bar-fill-proxmox" style="width: {{ $cpu_percent }}%;"></div>
+            </div>
+          </div>
+          
+          <div class="resource-item">
+            <div class="flex justify-between">
+              <span class="size-h5 uppercase"><span class="color-highlight">RAM</span> (<span>{{ printf "%.0f" (div $mem_used 1073741824) }}/{{ printf "%.0f" (div $mem_total 1073741824) }} GB</span>)</span>
+              <span class="color-highlight size-h3">{{ printf "%.1f" $mem_percent }}%</span>
+            </div>
+            <div class="resource-bar">
+              <div class="resource-bar-fill resource-bar-fill-proxmox" style="width: {{ $mem_percent }}%;"></div>
+            </div>
+          </div>
+          
+          <div class="resource-item">
+            <div class="flex justify-between">
+              <span class="size-h5 uppercase"><span class="color-highlight">STORAGE</span> (<span>{{ printf "%.0f" (div $disk_used 1073741824) }}/{{ printf "%.0f" (div $disk_total 1073741824) }} GB</span>)</span>
+              <span class="color-highlight size-h3">{{ printf "%.1f" $disk_percent }}%</span>
+            </div>
+            <div class="resource-bar">
+              <div class="resource-bar-fill resource-bar-fill-proxmox" style="width: {{ $disk_percent }}%;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+        
+
+        <!-- Nœuds individuels -->
+        {{ $nodes_online := len (.JSON.Array "data.#(type==\"node\")#|#(status==\"online\")#") }}
+          {{ $nodes_total := len (.JSON.Array "data.#(type==\"node\")#") }}
+
+        <div class="node-section">
+          <div class="node-title">
+            <span class="size-h5 uppercase color-highlight">NODES</span>
+            <span class="color-highlight size-h3">{{ $nodes_online }}/{{ $nodes_total }}</span>
+          </div>
+          {{ range .JSON.Array "data.#(type==\"node\")#" }}
+          <div class="node-stats">
+            <span class="node-name">{{ .String "node" }}</span>
+            <div class="node-value">
+              <span class="stat-value">{{ printf "%.1f" (mul (.Float "cpu") 100) }}%</span> CPU
+              <span class="stat-value" style="margin-left: 10px;">{{ printf "%.1f" (mul (div (.Float "mem") (.Float "maxmem")) 100) }}%</span> RAM
+            </div>
+          </div>
+          {{ end }}
+        </div>
+      
+      <!-- Compteurs -->
+      <div class="counter-section">
+        <div class="counter-item">
+          {{ $lxc_running := len (.JSON.Array "data.#(type==\"lxc\")#|#(status==\"running\")#|#(template==0)#") }}
+          {{ $lxc_total := len (.JSON.Array "data.#(type==\"lxc\")#|#(template==0)#") }}
+          <span class="color-highlight size-h3">{{ $lxc_running }}/{{ $lxc_total }}</span>
+          <span class="size-h5 uppercase">LXC</span>
+        </div>
+        <div class="counter-item">
+          {{ $qemu_running := len (.JSON.Array "data.#(type==\"qemu\")#|#(status==\"running\")#|#(template==0)#") }}
+          {{ $qemu_total := len (.JSON.Array "data.#(type==\"qemu\")#|#(template==0)#") }}
+          <span class="color-highlight size-h3">{{ $qemu_running }}/{{ $qemu_total }}</span>
+          <span class="size-h5 uppercase">VM</span>
+        </div>
+        <div class="counter-item">
+          {{ $storage_available := len (.JSON.Array "data.#(type==\"storage\")#|#(status==\"available\")#") }}
+          {{ $storage_total := len (.JSON.Array "data.#(type==\"storage\")#") }}
+          <span class="color-highlight size-h3">{{ $storage_available }}/{{ $storage_total }}</span>
+          <span class="size-h5 uppercase">Storage</span>
+        </div>
+      </div>
+    </div>

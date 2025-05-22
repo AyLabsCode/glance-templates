@@ -1,0 +1,95 @@
+- type: custom-api
+  title: Next episodes
+  title-url: http://192.168.1.177:8989
+  cache: 30m
+  options:
+    collapse-after: 3
+    show-grabbed: true
+    timezone: +02
+    cover-proxy: http://192.168.1.177:8989/cover
+  template: |
+    {{ $collapseAfter := .Options.IntOr "collapse-after" 5 }}
+    {{ $showGrabbed := .Options.BoolOr "show-grabbed" false }}
+    {{ $timezone := concat "2006-01-02T15:04:05" (.Options.StringOr "timezone" "+00") ":00" | parseTime "rfc3339" }}
+    {{ $coverProxy := .Options.StringOr "cover-proxy" "" }} {{/* To avoid exposing the API Key */}}
+    {{
+      $sonarr := newRequest "http://192.168.1.177:8989/api/v3/calendar"
+        | withParameter "includeSeries" "true"
+        | withParameter "start" (offsetNow "-24h" | startOfDay | formatTime "rfc3339")
+        | withParameter "end" (offsetNow "24h" | endOfDay | formatTime "rfc3339")
+        | withHeader "Accept" "application/json"
+        | withHeader "x-api-key" "${SONARR}"
+        | getResponse
+    }}
+    {{ $sonarrData := $sonarr.JSON.Array "" }}
+
+    {{ $coverEndpoint := "http://192.168.1.177:8989/api/v3/mediacover" }}
+    {{ $apiKey := concat "?apikey=" "${SONARR}" }}
+    
+    <ul class="list list-gap-14 collapsible-container single-line-titles" data-collapse-after="{{ $collapseAfter }}">
+      {{ $hasProxy := ne $coverProxy "" }}
+
+      {{ $notificationCount := 0 }}
+      {{ if eq (len ($sonarrData)) 0 }}
+        <li>No release this day!</li>
+      {{ end }}
+      {{ range $sonarrData }}
+
+      {{ $coverUrl := "" }}
+      {{ if $hasProxy }}
+        {{ $coverUrl = concat $coverProxy "/" (.String "seriesId") }}
+      {{ else }}
+        {{ $coverUrl = concat $coverEndpoint "/" (.String "seriesId") }}
+      {{ end }}
+
+      {{ $imageCoverUrl := concat $coverUrl "/poster-500.jpg" }}
+      {{ if not $hasProxy }}
+        {{ $imageCoverUrl = concat $imageCoverUrl $apiKey }}
+      {{ end }}
+
+      <li style="width: 100%;">
+        <div class="flex gap-10 items-start thumbnail-container thumbnail-parent" style="padding: 8px; width: 100%;">
+          <div class="shrink min-width-0" style="position: relative; display: flex; flex-direction: column; width: 100%;">
+            <div>
+              <strong class="size-h4 block text-truncate color-primary" title="{{ .String "series.title" }}">{{ .String "series.title" }}</strong>
+              <div class="text-very-compact text-truncate">
+                <span>{{ .String "title" }} (S{{ .Int "seasonNumber" | printf "%02d" }}<span class="color-highlight"> E{{ .Int "episodeNumber" | printf "%02d" }}</span></span>)
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                <div class="text-very-compact text-truncate">
+                  {{ $airDateUtc := .String "airDateUtc" | parseTime "rfc3339" }}
+                  <span>{{ ($airDateUtc.In $timezone.Location).Format "01/02 03:04PM" }}</span>
+                </div>
+
+                {{ if $showGrabbed }}
+                <a href="http://192.168.1.177:8989/series/{{ .String "series.titleSlug" }}#" target="_blank" rel="noreferrer">
+                  <div style="
+                    {{ if .Bool "hasFile" }}
+                      color: var(--color-positive);
+                      border: 1px solid var(--color-positive);
+                    {{ else }}
+                      color: var(--color-negative);
+                      border: 1px solid var(--color-negative);
+                    {{ end }}
+                    font-weight: bold;
+                    padding: 2px 5px;
+                    border-radius: 3px;
+                    display: inline-block;
+                    margin-top: 0;
+                  ">
+                    {{ if .Bool "hasFile" }}Grabbed{{ else }}Missing{{ end }}
+                  </div>
+                </a>
+                {{ else }}
+                <div class="text-truncate-2-lines margin-top-5">
+                  {{ .String "series.overview" }}
+                </div>
+                {{ end }}
+              </div>
+            </div>
+            
+          </div>
+        </div>
+      </li>
+      {{ end }}
+    </ul>

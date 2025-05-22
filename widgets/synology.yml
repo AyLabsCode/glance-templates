@@ -1,0 +1,162 @@
+- type: custom-api
+  title: Synology
+  cache: 10m
+  url: http://192.168.1.122:8123/api/states
+  headers:
+    Authorization: "Bearer ${HA}"
+    Content-Type: "application/json"
+  template: |
+    <style>
+      .drive-section {
+        border-top: 1px solid rgba(255,255,255,0.05);
+        padding-top: 12px;
+      }
+    </style>
+
+    {{ if eq .Response.StatusCode 200 }}
+      {{ $cpu := 0.0 }}
+      {{ $ram := 0.0 }}
+
+      {{ $volume1_percent := 0.0 }}
+      {{ $volume2_percent := 0.0 }}
+
+      {{ $drive1_etat := "" }}
+      {{ $drive1_temp := 0.0 }}
+      {{ $drive2_etat := "" }}
+      {{ $drive2_temp := 0.0 }}
+      {{ $drive3_etat := "" }}
+      {{ $drive3_temp := 0.0 }}
+      {{ $drive4_etat := "" }}
+      {{ $drive4_temp := 0.0 }}
+
+      {{ range .JSON.Array "" }}
+        {{ if eq (.String "entity_id") "sensor.aynas_utilisation_du_processeur_totale" }}
+          {{ $cpu = (.String "state") }}
+        {{ end }}
+
+        {{ if eq (.String "entity_id") "sensor.aynas_utilisation_de_la_memoire_reelle" }}
+          {{ $ram = (.String "state") }}
+        {{ end }}
+
+        {{ if eq (.String "entity_id") "sensor.aynas_volume_1_volume_utilise" }}
+          {{ $volume1_percent = (.String "state") }}
+        {{ end }}
+        
+        {{ if eq (.String "entity_id") "sensor.aynas_volume_2_volume_utilise" }}
+          {{ $volume2_percent = (.String "state") }}
+        {{ end }}
+        
+
+        {{ if eq (.String "entity_id") "sensor.aynas_drive_1_etat" }}
+          {{ $drive1_etat = .String "state" }}
+        {{ end }}
+        {{ if eq (.String "entity_id") "sensor.aynas_drive_1_temperature" }}
+          {{ $drive1_temp = (.String "state") }}
+        {{ end }}
+        {{ if eq (.String "entity_id") "sensor.aynas_drive_2_etat" }}
+          {{ $drive2_etat = .String "state" }}
+        {{ end }}
+        {{ if eq (.String "entity_id") "sensor.aynas_drive_2_temperature" }}
+          {{ $drive2_temp = (.String "state") }}
+        {{ end }}
+        {{ if eq (.String "entity_id") "sensor.aynas_drive_3_etat" }}
+          {{ $drive3_etat = .String "state" }}
+        {{ end }}
+        {{ if eq (.String "entity_id") "sensor.aynas_drive_3_temperature" }}
+          {{ $drive3_temp = (.String "state") }}
+        {{ end }}
+        {{ if eq (.String "entity_id") "sensor.aynas_drive_4_etat" }}
+          {{ $drive4_etat = .String "state" }}
+        {{ end }}
+        {{ if eq (.String "entity_id") "sensor.aynas_drive_4_temperature" }}
+          {{ $drive4_temp = (.String "state") }}
+        {{ end }}
+      {{ end }}
+
+      <div class="stats-bars">
+          <div class="resource-item">
+            <div class="flex justify-between">
+              <span class="size-h5 uppercase"><span class="color-highlight">CPU</span></span>
+              <span class="color-highlight size-h3">{{ $cpu }}%</span>
+            </div>
+            <div class="resource-bar">
+              <div class="resource-bar-fill resource-bar-fill-proxmox" style="width: {{ $cpu }}%;"></div>
+            </div>
+          </div>
+          
+          <div class="resource-item">
+            <div class="flex justify-between">
+              <span class="size-h5 uppercase"><span class="color-highlight">RAM</span> (<span>4 GB</span>)</span>
+              <span class="color-highlight size-h3">{{ $ram }}%</span>
+            </div>
+            <div class="resource-bar">
+              <div class="resource-bar-fill resource-bar-fill-proxmox" style="width: {{ $ram }}%;"></div>
+            </div>
+          </div>
+
+          <div class="separator"></div>
+
+          <div class="resource-item">
+            <div class="flex justify-between">
+              <span class="size-h5 uppercase"><span class="color-highlight">Data</span> (<span>8 TB</span>)</span>
+              <span class="color-highlight size-h3">{{ $volume1_percent }}%</span>
+            </div>
+            <div class="resource-bar">
+              <div class="resource-bar-fill resource-bar-fill-synology" style="width: {{ $volume1_percent }}%;"></div>
+            </div>
+          </div>
+
+            <div class="resource-item">
+            <div class="flex justify-between">
+              <span class="size-h5 uppercase"><span class="color-highlight">Multimedia</span> (<span>4 TB</span>)</span>
+              <span class="color-highlight size-h3">{{ $volume2_percent }}%</span>
+            </div>
+            <div class="resource-bar">
+              <div class="resource-bar-fill resource-bar-fill-synology" style="width: {{ $volume2_percent }}%;"></div>
+            </div>
+          </div>
+
+          <!-- Nœuds individuels -->
+          <div class="drive-section">
+            <div class="node-title">
+              <span class="size-h5 uppercase color-highlight">DRIVES</span>
+            </div>
+            <div class="node-stats">
+              <span class="node-name">Drive 1</span>
+              <div class="node-value">
+                <span class="stat-value">{{ $drive1_etat }}</span>
+                <span>-</span>
+                <span class="stat-value">{{ $drive1_temp }}°C</span>
+              </div>
+            </div>
+            <div class="node-stats">
+              <span class="node-name">Drive 2</span>
+              <div class="node-value">
+                <span class="stat-value">{{ $drive2_etat }}</span>
+                <span>-</span>
+                <span class="stat-value">{{ $drive2_temp }}°C</span>
+              </div>
+            </div>
+            <div class="node-stats">
+              <span class="node-name">Drive 3</span>
+              <div class="node-value">
+                <span class="stat-value">{{ $drive3_etat }}</span>
+                <span>-</span>
+                <span class="stat-value">{{ $drive3_temp }}°C</span>
+              </div>
+            </div>
+            <div class="node-stats">
+              <span class="node-name">Drive 4</span>
+              <div class="node-value">
+                <span class="stat-value">{{ $drive4_etat }}</span>
+                <span>-</span>
+                <span class="stat-value">{{ $drive4_temp }}°C</span>
+              </div>
+            </div>
+          </div>
+        </div>
+    {{ else }}
+      <div style="text-align: center;" class="color-negative size-h4">
+        Error: {{ .Response.StatusCode }} – {{ .Response.Status }}
+      </div>
+    {{ end }}

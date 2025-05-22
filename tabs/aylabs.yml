@@ -1,0 +1,8 @@
+- name: Videos
+  columns:
+    - size: full
+      widgets:
+        - type: videos
+          style: grid-cards
+          channels:
+            - UClCAe7FyrIwpkt9H56XRndA

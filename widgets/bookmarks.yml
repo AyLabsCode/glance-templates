@@ -1,0 +1,11 @@
+- type: bookmarks
+  groups:
+    - links:
+        - title: Proxmox Scripts
+          url: https://community-scripts.github.io/ProxmoxVE/
+        - title: Tailscale 
+          url: https://login.tailscale.com/admin/machines
+        - title: Freebox
+          url: https://mafreebox.freebox.fr/#Fbx.os.app.lanbrowser.app
+        - title: S3 Glacier
+          url: https://eu-west-1.signin.aws.amazon.com/oauth?client_id=arn:aws:signin:::console/glacier&code_challenge=i5Q-UedxMfXsw28KYRVKErFk_YwIo0yyda86pK0eozI&code_challenge_method=SHA-256&response_type=code&redirect_uri=https://eu-west-1.console.aws.amazon.com/glacier/home?hashArgs%3D%2523%252Fvaults%26isauthcode%3Dtrue%26oauthStart%3D1744918744869%26region%3Deu-west-1%26state%3DhashArgsFromTB_eu-west-1_3da6eea788e67b95

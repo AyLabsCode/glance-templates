@@ -1,0 +1,4 @@
+- type: dns-stats
+  service: pihole
+  url: http://192.168.1.161
+  token: ${PIHOLE}

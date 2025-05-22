@@ -1,0 +1,235 @@
+- type: monitor
+  cache: 1m
+  title: Hardware
+  sites:
+    - title: Beelink
+      url: http://192.168.1.80:8006
+      icon: di:proxmox
+      allow-insecure: true
+    - title: OptiPlex
+      url: http://192.168.1.116:8006
+      icon: di:proxmox
+      allow-insecure: true
+    - title: Synology DS923+
+      url: http://aynas:5000
+      check-url: http://192.168.1.71:5000
+      icon: di:synology
+- type: custom-api
+  title: Pings
+  title-url: http://192.168.1.190:3001
+  url: http://192.168.1.190:3001/api/status-page/aylabs
+  subrequests:
+    heartbeats:
+      url: http://192.168.1.190:3001/api/status-page/heartbeat/aylabs
+  cache: 5m
+  template: |
+    {{ $hb := .Subrequest "heartbeats" }}
+
+    {{ if not (.JSON.Exists "publicGroupList") }}
+    <p class="color-negative">Error reading response</p>
+    {{ else if eq (len (.JSON.Array "publicGroupList")) 0 }}
+    <p>No monitors found</p>
+    {{ else }}
+
+    <ul class="dynamic-columns list-gap-8">
+      {{ range .JSON.Array "publicGroupList" }}
+        {{ range $i, $monitor := .Array "monitorList" }}
+          {{ $id := $monitor.String "id" }}
+          {{ $hbArray := $hb.JSON.Array (print "heartbeatList." $id) }}
+          {{ $latest := index $hbArray (toInt (sub ((len $hbArray) | toFloat) 1)) }}
+          <div class="flex items-center gap-12" 
+            onmouseover="const img=this.querySelector('img'); img.style.opacity='1'; img.style.filter='none';"
+            onmouseout="const img=this.querySelector('img'); img.style.opacity='0.8'; img.style.filter='grayscale(0.4)';">
+
+            {{ if eq $i 0 }}
+              <img src="https://raw.githubusercontent.com/walkxcode/dashboard-icons/main/png/proxmox.png"
+                alt="qDevice Proxmox"
+                style="width: 32px; opacity: 0.8; transition: opacity 0.3s ease;filter: grayscale(0.4);"/>
+            {{ else if eq $i 1 }}
+              <img src="https://raw.githubusercontent.com/walkxcode/dashboard-icons/main/png/nut.png" alt="NUT" style="width: 32px; opacity: 0.8; transition: opacity 0.3s ease;filter: grayscale(0.4);"/>
+            {{ else if eq $i 2 }}
+              <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/52/Free_logo.svg/1200px-Free_logo.svg.png" alt="Freebox" style="width: 32px; opacity: 0.8; transition: opacity 0.3s ease;filter: grayscale(0.4);"/>
+            {{ else }}
+              <img src="https://raw.githubusercontent.com/walkxcode/dashboard-icons/main/png/server.png" alt="Server" style="width: 32px; opacity: 0.8; transition: opacity 0.3s ease;filter: grayscale(0.4);"/>
+            {{ end }}
+
+            {{ if eq $i 0 }}
+              <a class="size-title-dynamic color-highlight text-truncate block grow"
+                href="http://aynas:5000/"
+                target="_blank" rel="noreferrer">
+                {{ $monitor.String "name" }}
+              </a>
+            {{ else if eq $i 1 }}
+              <a class="size-title-dynamic color-highlight text-truncate block grow"
+                href="http://192.168.1.122:8123/config/devices/device/42c0476a2c995b73dcfc22d799286abb"
+                target="_blank" rel="noreferrer">
+                {{ $monitor.String "name" }}
+              </a>
+            {{ else if eq $i 2 }}
+              <a class="size-title-dynamic color-highlight text-truncate block grow"
+                href="https://mafreebox.freebox.fr/#Fbx.os.app.lanbrowser.app"
+                target="_blank" rel="noreferrer">
+                {{ $monitor.String "name" }}
+              </a>
+            {{ else }}
+              <a class="size-title-dynamic color-highlight text-truncate block grow"
+                href="http://192.168.1.190:3001/dashboard/{{ $id }}"
+                target="_blank" rel="noreferrer">
+                {{ $monitor.String "name" }}
+              </a>
+            {{ end }}
+
+            {{ if eq ($latest.Int "status") 1 }}
+              <div>{{ $latest.Int "ping" }}ms</div>
+              <div class="monitor-site-status-icon-compact" title="OK">
+                <svg fill="var(--color-positive)" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd"
+                    d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z"
+                    clip-rule="evenodd"></path>
+                </svg>
+              </div>
+            {{ else }}
+              <div><span class="color-negative">DOWN</span></div>
+              <div class="monitor-site-status-icon-compact" title="{{ if $latest.Exists "msg" }}{{ $latest.String "msg" }}{{ else }}Error{{ end }}">
+                <svg fill="var(--color-negative)" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd"
+                    d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z"
+                    clip-rule="evenodd"></path>
+                </svg>
+              </div>
+            {{ end }}
+          </div>
+        {{ end }}
+      {{ end }}
+    </ul>
+    {{ end }}
+- type: monitor
+  cache: 1m
+  title: Services
+  sites:
+    - title: Home Assistant
+      url: http://192.168.1.122:8123
+      icon: di:home-assistant
+      allow-insecure: true
+    - title: Zigbee2MQTT
+      url: http://zigbee2mqtt:8081/
+      check-url: http://192.168.1.131:8081
+      icon: di:zigbee2mqtt
+    - title: Docmost
+      url: http://docmost:3000
+      check-url: http://192.168.1.157:3000
+      icon: https://img-s-msn-com.akamaized.net/tenant/amp/entityid/AA1zaNBE.img?w=768&h=768&m=6
+    - title: Vikunja
+      url: http://vikunja:3456/
+      check-url: http://192.168.1.153:3456
+      icon: di:vikunja
+    - title: N8N
+      url: http://n8n:5678
+      check-url: http://192.168.1.82:5678
+      icon: di:n8n
+    - title: Portainer
+      url: https://100.106.192.97:9443/#!/auth
+      check-url: https://192.168.1.35:9443/#!/auth
+      icon: di:portainer
+      allow-insecure: true
+    - title: Synology Photos
+      url: http://aynas:5000/?launchApp=SYNO.Foto.AppInstance&SynoToken=HKx6ah9oMXkvk#/personal_space/timeline
+      check-url: http://192.168.1.71:5000
+      icon: https://www.storagealchemist.com/wp-content/uploads/2022/04/Syno-Photos-logo-DSM7.png
+    - title: Synology Drive
+      url: http://aynas:5000/?launchApp=SYNO.SDS.Drive.Application#MyDrive
+      check-url: http://192.168.1.71:5000
+      icon: https://play-lh.googleusercontent.com/DOhj0GDYlhVFlmmxWvQBL--KXNYs2EcDloCoEIcuckKcBUYbLbDq-op-B4n-C8B6JuQ=w240-h480-rw
+    - title: PiHole
+      url: http://192.168.1.161/admin
+      check-url: http://192.168.1.161
+      icon: di:pi-hole
+      allow-insecure: true
+    - title: Uptime Kuma
+      url: http://uptimekuma:3001
+      check-url: http://192.168.1.190:3001
+      icon: di:uptime-kuma
+    - title: Grafana
+      url: http://grafana:3000
+      check-url: http://192.168.1.158:3000
+      icon: di:grafana
+    - title: InfluxDB
+      url: http://192.168.1.151:8888
+      icon: di:influxdb
+    - title: Mealie
+      url: http://192.168.1.35:9925/login/
+      icon: di:mealie
+    - title: ActualBudget
+      url: http://actualbudget:5006
+      check-url: http://192.168.1.64:5006
+      icon: di:actual-budget
+    - title: HomeBox
+      url: http://homebox:7745
+      check-url: http://192.168.1.88:7745
+      icon: di:homebox
+      allow-insecure: true
+    - title: MySpeed
+      url: http://myspeed:5216
+      check-url: http://192.168.1.167:5216
+      icon: di:myspeed
+    - title: MQTT
+      url: http://192.168.1.131:8081/#/device/0xa4c13865734561ed/info
+      icon: si:mqtt
+      allow-insecure: true
+    - title: AFFiNE
+      url: http://affine:3010
+      check-url: http://192.168.1.126:3010
+      icon: di:affine-light
+    - title: Nginx Proxy Manager
+      url: http://nginxproxymanager:81
+      check-url: http://192.168.1.9:81
+      icon: di:nginx-proxy-manager
+- type: monitor
+  cache: 1m
+  title: Servarr
+  sites:
+    - title: Plex
+      url: http://plex:32400/web
+      check-url: http://192.168.1.81:32400/web
+      icon: di:plex
+    - title: Komga
+      url: http://komga:25600/
+      check-url: http://192.168.1.147:25600
+      icon: di:komga
+    - title: Overseerr
+      url: http://overseerr:5055
+      check-url: http://192.168.1.106:5055
+      icon: di:overseerr
+    - title: Homarr
+      url: http://homarr:3000/board
+      check-url: http://192.168.1.49:3000
+      icon: di:homarr
+      allow-insecure: true
+    - title: Tautulli
+      url: http://tautulli:8181/
+      check-url: http://192.168.1.86:8181
+      icon: di:tautulli
+    - title: qBittorrent
+      url: http://qbittorrent:8090
+      check-url: http://192.168.1.26:8090
+      icon: di:qbittorrent
+    - title: Radarr
+      url: http://radarr:7878/
+      check-url: http://192.168.1.40:7878
+      icon: di:radarr
+    - title: Sonarr
+      url: http://sonarr:8989/
+      check-url: http://192.168.1.177:8989
+      icon: di:sonarr
+    - title: Readarr
+      url: http://readarr:8787
+      check-url: http://192.168.1.170:8787
+      icon: di:readarr
+    - title: Prowlarr
+      url: http://prowlarr:9696
+      check-url: http://192.168.1.140:9696
+      icon: di:prowlarr
+    - title: FlareSolverr
+      url: http://192.168.1.183:8191
+      icon: di:flaresolverr
+  

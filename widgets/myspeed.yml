@@ -1,0 +1,19 @@
+- type: custom-api
+  cache: 1h
+  title: Internet Speed
+  url: http://192.168.1.167:5216/api/speedtests?hours=24
+  template: |
+    <div class="flex justify-between text-center margin-block-3">
+        <div>
+            <div class="color-highlight size-h3">{{ (.JSON.Get "0.download").Value }}</div>
+            <div class="size-h6">DOWNLOAD</div>
+        </div>
+        <div>
+            <div class="color-highlight size-h3">{{ (.JSON.Get "0.upload").Value }}</div>
+            <div class="size-h6">UPLOAD</div>
+        </div>
+        <div>
+            <div class="color-highlight size-h3">{{ (.JSON.Get "0.ping").Value }}</div>
+            <div class="size-h6">PING</div>
+        </div>
+    </div>

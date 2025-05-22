@@ -1,0 +1,221 @@
+- type: custom-api
+  title: PLEX
+  cache: 1m
+  url: http://192.168.1.81:32400/status/sessions
+  headers:
+    Accept: application/json
+    X-Plex-Token: ${PLEX}
+  template: |
+    {{/* USER VARIABLES BEGIN */}}
+
+    {{/* Set to true if using the widget in a small column */}}
+    {{ $isSmallColumn := true }}
+
+    {{/* Set to true to use compact mode */}}
+    {{ $isCompact := true }}
+
+    {{/* Set to "text" to display the playing state in plain text */}}
+    {{/* Set to "indicator" to display a status badge instead of text */}}
+    {{/* Set to "" to hide the play state */}}
+    {{ $playState := "indicator" }}
+
+    {{/* Set to true to show thumbnails */}}
+    {{ $showThumbnail := true }}
+
+    {{/* Set to true to display paused items */}}
+    {{ $showPaused := false }}
+
+    {{/* Set to false to hide "Progress Bar" */}}
+    {{ $showProgressBar := true }}
+
+    {{/* Set to false to hide "Progress Info". Depends on $showProgressBar */}}
+    {{ $showProgressInfo := true }}
+
+    {{/* USER VARIABLES END */}}
+
+    {{ if eq .Response.StatusCode 200 }}
+      {{ $sessions := .JSON.Array "MediaContainer.Metadata" }}
+
+      {{ if eq (len $sessions) 0 }}
+        <p>Nobody's watching at this moment.</p>
+      {{ else }}
+        {{ if $isSmallColumn }}
+          <div class="flex flex-column gap-10">
+        {{ else }}
+          <div class="gap-10" style="display: grid; grid-template-columns: repeat(2, 1fr);">
+        {{ end }}
+
+          {{ range $i, $session := $sessions }}
+            {{/* WIDGET VARIABLES BEGIN */}}
+
+            {{ $mediaType := $session.String "type" }}
+            {{ $isPlaying := eq ($session.String "Player.state") "playing" }}
+            {{ $state := $session.String "Player.state" }}
+
+            {{ $isMovie := eq $mediaType "movie" }}
+            {{ $isShows := eq $mediaType "episode" }}
+            {{ $isMusic := eq $mediaType "track" }}
+
+            {{ $user := $session.String "User.title"}}
+            {{ $movieTitle := $session.String "title" }}
+            {{ $showTitle := $session.String "grandparentTitle" }}
+            {{ $showSeason := $session.String "parentIndex" }}
+            {{ $showEpisode := $session.String "index" }}
+            {{ $episodeTitle := $session.String "title" }}
+            {{ $artist := $session.String "grandparentTitle" }}
+            {{ $albumTitle := $session.String "parentTitle" }}
+            {{ $songTitle := $session.String "title" }}
+            {{ $default := $session.String "title" }}
+
+            {{ $thumbPath := $session.String "thumb" }}
+            {{ if or $isShows $isMusic }}
+              {{ $thumbPath = $session.String "parentThumb" }}
+            {{ end }}
+            {{ $thumbURL := concat "http://192.168.1.81:32400" $thumbPath "?X-Plex-Token=${PLEX}" }}
+
+            {{ $duration := $session.Float "duration" }}
+            {{ $offset := $session.Float "viewOffset" }}
+            {{ $progress := mul 100 (div $offset $duration) | toInt }}
+            {{ $remainingSeconds := div (sub $duration $offset) 1000 | toInt }}
+            {{ $remainingSecondsString := printf "%ds" $remainingSeconds }}
+            {{ $endTime := offsetNow $remainingSecondsString }}
+            {{ $endHour := printf "%02d" $endTime.Hour }}
+            {{ $endMinute := printf "%02d" $endTime.Minute }}
+
+
+            {{/* WIDGET VARIABLES END */}}
+
+            {{/* WIDGET TEMPLATE BEGIN */}}
+
+            {{ if or $isPlaying $showPaused }}
+              <div class="card gap-5">
+                <div class="flex items-center gap-10 size-h3">
+                  <span class="color-primary">{{ $user }}</span>
+
+                  {{ if eq $playState "text" }}
+                    <span {{ if $isPlaying }}class="color-primary"{{ end }}>
+                      ({{ $state }})
+                    </span>
+                  {{ else if eq $playState "indicator" }}
+                    <style>
+                      @keyframes pulse {
+                        0% { box-shadow: 0 0 0 0 var(--color-text-base); }
+                        40% { box-shadow: 0 0 0 4px transparent; }
+                        100% { box-shadow: 0 0 0 4px transparent; }
+                      }
+                    </style>
+                    <div
+                      style="
+                        {{ if $isPlaying }}
+                          animation: pulse 5s infinite;
+                          background: var(--color-primary);
+                        {{ else }}
+                          background: var(--color-text-base-muted);
+                        {{ end }}
+                        height: .7rem;
+                        width: .7rem;
+                        border-radius: 100%;
+                      "
+                    ></div>
+                  {{ else }}
+                  {{ end }}
+                </div>
+
+                <hr class="margin-bottom-5" />
+
+                <div class="flex items-center gap-10" style="align-items: stretch;">
+                  {{ if eq $showThumbnail true }}
+                    <img
+                      src="{{ $thumbURL }}"
+                      alt="{{ $default }} thumbnail"
+                      class="shrink-0"
+                      loading="lazy"
+                      style="max-width: 7.5rem;
+                        border: 2px solid var(--color-primary);
+                        border-radius: var(--border-radius);
+                        object-fit: cover;
+                        {{ if $isCompact }}aspect-ratio: 1;{{ end }}
+                      "
+                    />
+                  {{ end }}
+
+                  <ul
+                    class="flex flex-column grow justify-evenly"
+                    style="width: 0;"
+                  >
+                    {{ if $isMovie }}
+                      <li>{{ $movieTitle }}</li>
+                    {{ else if $isShows }}
+                      {{ if $isCompact }}
+                        <ul class="list-horizontal-text flex-nowrap">
+                          <li class="text-truncate shrink-0">{{ concat "S" $showSeason "E" $showEpisode }}</li>
+                          <li class="text-truncate">{{ $showTitle }}</li>
+                        </ul>
+                        <li class="text-truncate">{{ $episodeTitle }}</li>
+                      {{ else }}
+                        <li class="text-truncate">{{ $showTitle }}</li>
+                        <li class="text-truncate">{{ concat "Season " $showSeason " Episode " $showEpisode }}</li>
+                        <li>{{ $episodeTitle }}</li>
+                      {{ end }}
+                    {{ else if $isMusic }}
+                      {{ if $isCompact }}
+                        <ul class="list-horizontal-text flex-nowrap">
+                          <li class="text-truncate shrink-0">{{ $artist }}</li>
+                          <li class="text-truncate">{{ $albumTitle }}</li>
+                        </ul>
+                      {{ else }}
+                        <li class="text-truncate">{{ $artist }}</li>
+                        <li class="text-truncate">{{ $albumTitle }}</li>
+                      {{ end }}
+                      <li class="text-truncate">{{ $songTitle }}</li>
+                    {{ else }}
+                      <li>{{ $default }}</li>
+                    {{ end }}
+
+                    <li>
+                      {{ if and $isPlaying $showProgressBar }}
+                        <div class="flex gap-10 items-center">
+                          <div
+                            class="grow"
+                            style="height: 1rem;
+                              max-width: 32rem;
+                              border: 1px solid var(--color-text-base);
+                              border-radius: var(--border-radius);
+                              overflow: hidden;"
+                          >
+                            <style>
+                              @keyframes progress-animation {
+                                to { width: 100%; }
+                              }
+                            </style>
+                            <div
+                              style="height: 100%;
+                                width: {{ $progress }}%;
+                                background: var(--color-primary);
+                                border-radius: 3px;
+                                transition: width 1s linear;
+                                animation: progress-animation {{ $remainingSeconds }}s linear forwards;"
+                              data-progress="{{ $progress }}"
+                              data-remaining="{{ $remainingSeconds }}">
+                            </div>
+                          </div>
+
+                          {{ if $showProgressInfo }}
+                            <p>{{ if and ( not $isCompact ) ( not $isSmallColumn ) }}ends at {{ end }}{{ $endHour -}}:{{- $endMinute }}</p>
+                          {{ end }}
+                        </div>
+                      {{ end }}
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            {{ end }}
+
+            {{/* WIDGET TEMPLATE END */}}
+
+          {{ end }}
+        </div>
+      {{ end }}
+    {{ else }}
+      <p>Failed to fetch Plex sessions</p>
+    {{ end }}

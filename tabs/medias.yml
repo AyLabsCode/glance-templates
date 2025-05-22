@@ -1,0 +1,11 @@
+- name: Medias
+  columns:
+    - size: small
+      widgets: 
+        $include: ../widgets/plex-watching.yml
+        $include: ../widgets/sonarr.yml
+        
+    - size: full
+      widgets:
+        $include: ../widgets/plex-history.yml
+        

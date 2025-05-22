@@ -1,0 +1,27 @@
+- name: Feeds
+  columns:
+    - size: small
+      widgets:
+        - type: calendar
+          first-day-of-week: monday
+    - size: full
+      widgets:
+        - type: search
+          search-engine: google
+        - type: group
+          widgets:
+            - type: reddit
+              subreddit: homelab
+              show-thumbnails: true
+            - type: reddit
+              subreddit: homeassistant
+              show-thumbnails: true
+            - type: reddit
+              subreddit: 3DPrinting
+              show-thumbnails: true
+    - size: small
+      widgets:
+        - type: weather
+          units: metric
+          hour-format: 24h
+          location: Lille, France
