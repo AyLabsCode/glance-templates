@@ -8,6 +8,7 @@ YAML configuration for [glanceapp/glance](https://github.com/glanceapp/glance)
 
 ## Install Glance on Proxmox with community scripts
 - Install it from https://community-scripts.github.io/ProxmoxVE/scripts?id=glance
+- Then, go to console and execute these commands
 ```bash
 cd /opt/glance
 rm glance.yml
